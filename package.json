@@ -1,0 +1,26 @@
+{
+    "name"        : "scripts-tmux-screen",
+    "author"      : "James Nylen <jnylen@gmail.com>",
+    "description" : "Scripts for working with tmux and screen.",
+    "version"     : "0.0.1",
+    "repository"  : {
+        "type" : "git",
+        "url"  : "https://github.com/nylen/scripts-tmux-screen"
+    },
+    "bugs" : {
+        "url" : "https://github.com/nylen/scripts-tmux-screen/issues"
+    },
+    "license"  : "MIT",
+    "keywords" : [
+        "scripts",
+        "tmux",
+        "screen"
+    ],
+    "bin" : {
+        "tmx"           : "bin/tmx",
+        "manage-screen" : "bin/manage-screen"
+    },
+    "dependencies" : {
+        "commander" : "~2.0.0"
+    }
+}

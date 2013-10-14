@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+
+var program = require('commander');
+
+program
+    .version(require('../package').version)
+    .option('-s, --session <name>' , 'Name of screen session')
+    .option('-x, --execute [cmd]'  , 'Command to execute')
+    .option('-d, --directory [dir]', 'Directory that screen will change to')
+    .option('-c, --config [file]'  , "Path to screen config file (if used, '--execute' and '--directory' are ignored)")
+    .option('-k, --kill'           , 'Kill the screen session with the given name, then exit')
+    .option('-m, --multi'          , 'Allow more than one session with the same name');
+
+program.on('--help', function() {
+    console.log('  Required options:');
+    console.log('');
+    console.log("    '--name', and one of:");
+    console.log("    '--execute', '--config', or '--kill'");
+    console.log('');
+    console.log("  Any additional options after '--' will be passed to screen.");
+});
+
+program.parse(process.argv);

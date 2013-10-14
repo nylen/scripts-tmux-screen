@@ -1,0 +1,41 @@
+#!/bin/sh
+
+# Originally from:
+# https://wiki.archlinux.org/index.php/Tmux#Clients_simultaneously_interacting_with_various_windows_of_a_session
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 session-name"
+    echo
+    "$0" ls
+    exit
+fi
+
+if [ "$1" = ls ]; then
+    # `tmux ls` should align output on the colons, but it doesn't
+    tmux ls | perl -we '
+        my @lines = (), $len = 0;
+        while (<STDIN>) {
+            my @line = split ":", $_, 2;
+            push @lines, \@line;
+            $len = length $line[0] if length $line[0] > $len;
+        }
+        printf "%-${len}s :%s", @{$_} for @lines;
+    '
+    exit
+fi
+
+session="$1"
+tmux_nb=$((`tmux ls | grep "^$session" | wc -l`))
+if [ "$tmux_nb" = "0" ]; then
+    echo "Launching tmux base session $session ..."
+    tmux new-session -s $session
+else
+    # Make sure we are not already in a tmux session
+    if [ ! -z "$TMUX" ]; then
+        echo "Already in tmux session: $TMUX"
+        exit
+    fi
+
+    # Attach to the session, detaching other clients
+    tmux attach-session -d -t "$session"
+fi
