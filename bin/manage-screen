@@ -1,23 +1,159 @@
 #!/usr/bin/env node
 
-var program = require('commander');
+var cp      = require('child_process'),
+    program = require('commander'),
+    fs      = require('fs'),
+    Lazy    = require('lazy'),
+    temp    = require('temp'),
+    util    = require('util'),
+    XRegExp = require('xregexp').XRegExp;
 
 program
     .version(require('../package').version)
     .option('-s, --session <name>' , 'Name of screen session')
     .option('-x, --execute [cmd]'  , 'Command to execute')
-    .option('-d, --directory [dir]', 'Directory that screen will change to')
     .option('-c, --config [file]'  , "Path to screen config file (if used, '--execute' and '--directory' are ignored)")
     .option('-k, --kill'           , 'Kill the screen session with the given name, then exit')
+    .option('-d, --directory [dir]', 'Directory that screen will change to')
     .option('-m, --multi'          , 'Allow more than one session with the same name');
 
 program.on('--help', function() {
+    console.log();
     console.log('  Required options:');
-    console.log('');
-    console.log("    '--name', and one of:");
+    console.log();
+    console.log("    '--session', and one of:");
     console.log("    '--execute', '--config', or '--kill'");
-    console.log('');
+    console.log();
     console.log("  Any additional options after '--' will be passed to screen.");
+    console.log();
 });
 
-program.parse(process.argv);
+var argv            = [],
+    foundScreenArgs = false,
+    screenExtraArgs = [];
+
+process.argv.forEach(function(arg, i) {
+    if (i > 1 && arg == '--') {
+        foundScreenArgs = true;
+    } else if (foundScreenArgs) {
+        screenExtraArgs.push(arg);
+    } else {
+        argv.push(arg);
+    }
+});
+
+program.parse(argv);
+
+program.options.forEach(function(opt) {
+    var name = opt.name();
+    if (opt.required && !program[name]) {
+        console.error("error: missing required argument '--%s'", name);
+        program.help();
+    }
+});
+
+if (!program.execute && !program.config && !program.kill) {
+    console.error("error: missing required argument: one of '--execute', '--config', or '--kill'");
+    program.help();
+}
+
+var sessionPid,
+    sessionName,
+    sessionId,
+    match,
+    matchScreenLine = XRegExp('\
+                  (?<pid>   [0-9]+              )     \
+        \\.       (?<name>  [a-z0-9.-]+         )     \
+        \\s+ \\(  (?<date>  [0-9/\\ :]+\\ [AP]M )  \\)\
+        \\s+ \\(  (?<state> [a-z, -]+           )  \\)\
+    ', 'xi');
+
+var screen = cp.spawn('screen', ['-list']);
+
+Lazy(cp.spawn('screen', ['-list']).stdout)
+    .lines
+    .map(String)
+    .forEach(function(line) {
+        if (match = XRegExp.exec(line, matchScreenLine)) {
+            if (match.name == program.session) {
+                sessionPid  = match.pid;
+                sessionName = match.name;
+                sessionId   = match.pid + '.' + match.name;
+            }
+        }
+    })
+    .join(function() {
+        killSessionIfNeeded();
+    });
+
+function killSessionIfNeeded() {
+    function next() {
+        if (!program.kill) {
+            setupConfig();
+        }
+    }
+
+    if (program.kill || !program.multi) {
+        if (sessionPid) {
+            cp.spawn('screen', ['-x', sessionId, '-X', 'quit'])
+            .on('close', function(code) {
+                console.log("Killed screen session '%s'", sessionId);
+                next();
+            });
+        } else {
+            if (program.kill) {
+                console.log("Cannot kill screen '%s': session not found", program.session);
+            }
+            next();
+        }
+    } else {
+        next();
+    }
+}
+
+function setupConfig() {
+    if (program.config) {
+
+        startSession(program.config);
+
+    } else {
+
+        temp.open('screenrc', function(err, info) {
+            if (err) throw err;
+
+            if (program.directory) {
+                fs.write(info.fd, util.format(
+                    'chdir "%s"\n',
+                    program.directory));
+            }
+            fs.write(info.fd, 'screen\n');
+            fs.write(info.fd, util.format(
+                'stuff "%s\\012"\n',
+                program.execute.replace(/"/g, '\\"')));
+            fs.write(info.fd, util.format(
+                'title "%s"',
+                program.session));
+
+            fs.close(info.fd, function(err) {
+                if (err) throw err;
+                startSession(info.path);
+            });
+        });
+
+    }
+}
+
+function startSession(configPath) {
+    cp.spawn('screen',
+        ['-c', configPath]
+            .concat(screenExtraArgs)
+            .concat(['-dmS', program.session]))
+    .on('close', function(code) {
+        console.log("Started screen session '%s'", program.session);
+        if (!program.config) {
+            setTimeout(function() {
+                fs.unlinkSync(configPath);
+            }, 250);
+        }
+    });
+}
