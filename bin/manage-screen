@@ -122,15 +122,15 @@ function setupConfig() {
             if (err) throw err;
 
             if (program.directory) {
-                fs.write(info.fd, util.format(
+                fs.writeSync(info.fd, util.format(
                     'chdir "%s"\n',
                     program.directory));
             }
-            fs.write(info.fd, 'screen\n');
-            fs.write(info.fd, util.format(
+            fs.writeSync(info.fd, 'screen\n');
+            fs.writeSync(info.fd, util.format(
                 'stuff "%s\\012"\n',
                 program.execute.replace(/"/g, '\\"')));
-            fs.write(info.fd, util.format(
+            fs.writeSync(info.fd, util.format(
                 'title "%s"',
                 program.session));
 
