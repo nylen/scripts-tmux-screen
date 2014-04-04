@@ -2,7 +2,7 @@
     "name"        : "scripts-tmux-screen",
     "author"      : "James Nylen <jnylen@gmail.com>",
     "description" : "Scripts for working with tmux and screen.",
-    "version"     : "0.0.1",
+    "version"     : "0.0.2",
     "repository"  : {
         "type" : "git",
         "url"  : "https://github.com/nylen/scripts-tmux-screen"
