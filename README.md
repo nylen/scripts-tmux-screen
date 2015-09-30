@@ -27,13 +27,4 @@ or more commands, each in its own window.
 `tmux-session` requires tmux 1.7 or higher, for the `-l` (literal) option to
 the `send-keys` command.
 
-### npmi
-
-`npmi` is a wrapper for `npm install` that will automatically add the given
-packages to the `package.json` file, then re-indent it using
-[`json-align`](https://github.com/nylen/node-json-align).
-
-    # To install package abcde:
-    npmi abcde
-
 ### More to come eventually!
