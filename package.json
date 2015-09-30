@@ -18,12 +18,18 @@
     ],
     "bin" : {
         "tmx"           : "bin/tmx",
-        "manage-screen" : "bin/manage-screen"
+        "manage-screen" : "bin/manage-screen",
+        "tmux-session"  : "bin/tmux-session"
     },
     "dependencies" : {
-        "commander" : "~2.0.0",
-        "lazy"      : "~1.0.11",
-        "xregexp"   : "~2.0.0",
-        "temp"      : "~0.6.0"
+        "async"           : "^1.4.2",
+        "commander"       : "~2.0.0",
+        "json5"           : "^0.4.0",
+        "lazy"            : "~1.0.11",
+        "spawn-sync"      : "^1.0.13",
+        "temp"            : "~0.6.0",
+        "tilde-expansion" : "0.0.0",
+        "xregexp"         : "~2.0.0",
+        "yargs"           : "^3.26.0"
     }
 }

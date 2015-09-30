@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+
+var async       = require('async'),
+    JSON5       = require('json5'),
+    spawnSync   = require('spawn-sync'),
+    tildeExpand = require('tilde-expansion'),
+    util        = require('util'),
+    yargs       = require('yargs');
+
+var argv = require('yargs')
+    .option('name', {
+        alias    : 'n',
+        describe : 'tmux session name',
+        type     : 'string',
+        demand   : true
+    })
+    .option('config', {
+        alias    : 'c',
+        describe : 'config (JSON5 string; default is to read from stdin)',
+        type     : 'string'
+    })
+    .argv;
+
+if (!argv.name) {
+    throw new Error('tmux session name is required');
+}
+
+console.error('tmux ls');
+
+var tmuxLs = spawnSync('tmux', ['ls']),
+    stdout = tmuxLs.stdout.toString().trim(),
+    stderr = tmuxLs.stderr.toString().trim();
+
+if (tmuxLs.status != 0) {
+    // tmux 1.6: 'failed to connect to server'
+    // tmux 2.0: 'failed to connect to server: Connection refused'
+    if (!/^failed to connect to server/.test(stderr)) {
+        throw new Error(util.format(
+            'Unexpected tmux exit code %d - stderr: %s',
+            tmuxLs.status,
+            stderr
+        ));
+    }
+} else {
+    stdout.split('\n').forEach(function(line) {
+        var sessionName = line.split(':')[0];
+        if (sessionName == argv.name) {
+            throw new Error(util.format(
+                "tmux session '%s' already exists",
+                argv.name
+            ));
+        }
+    });
+}
+
+function runTmux(args, options) {
+    console.error('tmux %s', args.join(' '));
+    var tmux = spawnSync('tmux', args, options);
+    if (tmux.error || tmux.status != 0) {
+        throw new Error(util.format(
+            "tmux command 'tmux %s' failed with %s: %s",
+            args.join(' '),
+            (tmux.error ? tmux.error.message : 'code' + tmux.status),
+            (tmux.stderr || '').toString().trim()
+        ));
+    }
+    return tmux.stdout.toString().trim();
+}
+
+function startSession(sessionName, config) {
+    var windows = config.windows || [];
+
+    delete process.env.TMUX;
+    runTmux(['new-session', '-s', sessionName, '-d'], {
+        cwd : config.wd || (windows[0] && windows[0].wd)
+    });
+
+    async.forEachOfSeries(windows, function(win, i, next) {
+        if (i > 0) {
+            var wd = config.cwd || win.cwd;
+            if (wd) {
+                tildeExpand(wd, addWindow);
+            } else {
+                addWindow('-', true); // '-': Where session was started
+            }
+        } else {
+            setupWindow(true);
+        }
+
+        function addWindow(wd, isSync) {
+            runTmux(['new-window', '-t', sessionName, '-c', wd]);
+
+            setupWindow(isSync);
+        }
+
+        function setupWindow(isSync) {
+            if (win.name) {
+                runTmux(['rename-window', '-t', sessionName + ':' + i, win.name]);
+            }
+            if (win.command) {
+                runTmux(['send-keys', '-t', sessionName + ':' + i, '-l', win.command]);
+                if (win.pressEnter !== false) {
+                    runTmux(['send-keys', '-t', sessionName + ':' + i, 'Enter']);
+                }
+            }
+            if (isSync) {
+                process.nextTick(next);
+            } else {
+                next();
+            }
+        }
+    });
+}
+
+if (argv.config) {
+    startSession(argv.name, JSON5.parse(argv.config));
+} else {
+    // read config from stdin
+    var stdin = '';
+
+    process.stdin.on('data', function(buf) {
+        stdin += buf.toString();
+    }).on('end', function() {
+        startSession(argv.name, JSON5.parse(stdin));
+    }).resume();
+}
