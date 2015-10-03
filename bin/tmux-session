@@ -67,28 +67,31 @@ function runTmux(args, options) {
     return tmux.stdout.toString().trim();
 }
 
-function startSession(sessionName, config) {
-    var windows = config.windows || [];
-
+function startSession(sessionName, config, wd) {
     delete process.env.TMUX;
     runTmux(['new-session', '-s', sessionName, '-d'], {
-        cwd : config.wd || (windows[0] && windows[0].wd)
+        cwd : wd
     });
 
-    async.forEachOfSeries(windows, function(win, i, next) {
+    async.forEachOfSeries(config.windows || [], function(win, i, next) {
         if (i > 0) {
-            var wd = config.cwd || win.cwd;
+            var wd = config.wd || win.wd;
             if (wd) {
                 tildeExpand(wd, addWindow);
             } else {
-                addWindow('-', true); // '-': Where session was started
+                addWindow(null, true);
             }
         } else {
             setupWindow(true);
         }
 
         function addWindow(wd, isSync) {
-            runTmux(['new-window', '-t', sessionName, '-c', wd]);
+            var args = ['new-window', '-t', sessionName];
+
+            if (wd) {
+                args = args.concat(['-c', wd]);
+            }
+            runTmux(args);
 
             setupWindow(isSync);
         }
@@ -112,8 +115,21 @@ function startSession(sessionName, config) {
     });
 }
 
+function parseWorkingDirectoryAndStartSession(name, config) {
+    var windows = config.windows || [],
+        wd = config.wd || (windows[0] && windows[0].wd);
+
+    if (wd) {
+        tildeExpand(wd, function(wd) {
+            startSession(name, config, wd);
+        });
+    } else {
+        startSession(name, config);
+    }
+}
+
 if (argv.config) {
-    startSession(argv.name, JSON5.parse(argv.config));
+    parseWorkingDirectoryAndStartSession(argv.name, JSON5.parse(argv.config));
 } else {
     // read config from stdin
     var stdin = '';
@@ -121,6 +137,6 @@ if (argv.config) {
     process.stdin.on('data', function(buf) {
         stdin += buf.toString();
     }).on('end', function() {
-        startSession(argv.name, JSON5.parse(stdin));
+        parseWorkingDirectoryAndStartSession(argv.name, JSON5.parse(stdin));
     }).resume();
 }
