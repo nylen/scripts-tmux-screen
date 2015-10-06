@@ -1,0 +1,18 @@
+The config object is a JavaScript (JSON5) object
+with the following structure:
+
+{
+    wd      : 'working directory of session',
+    windows : [
+        // array of objects (all properties are optional)
+        {
+            name    : 'window title',
+            command : 'execute this',
+            wd      : 'window-specific working directory'
+        }
+    ]
+}
+
+If the 'config' parameter is not specified then
+the config object will be read from stdin.
+
