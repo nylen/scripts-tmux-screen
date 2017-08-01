@@ -79,18 +79,17 @@ function startSession(sessionName, config, wd) {
     });
 
     async.forEachOfSeries(config.windows || [], function(win, i, next) {
-        if (i > 0) {
-            var wd = config.wd || win.wd;
-            if (wd) {
-                tildeExpand(wd, addWindow);
-            } else {
-                addWindow(null, true);
-            }
+        var windowFn = (i > 0 ? addWindow : setUpFirstWindow);
+        // FIXME: Windows created after the first don't respect the `cwd`
+        // setting used to start the tmux session.
+        var wd = (i > 0 ? win.wd || config.wd : win.wd);
+        if (wd) {
+            tildeExpand(wd, windowFn);
         } else {
-            setupWindow(true);
+            windowFn(null);
         }
 
-        function addWindow(wd, isSync) {
+        function addWindow(wd) {
             var args = ['new-window', '-t', sessionName];
 
             if (wd) {
@@ -98,12 +97,21 @@ function startSession(sessionName, config, wd) {
             }
             runTmux(args);
 
-            setupWindow(isSync);
+            setUpFirstWindow();
         }
 
-        function setupWindow(isSync) {
+        function setUpFirstWindow(wd) {
             if (win.name) {
                 runTmux(['rename-window', '-t', sessionName + ':' + i, win.name]);
+            }
+            if (wd) {
+                // If the first window has a window-specific working directory,
+                // set it using `cd`.
+                runTmux([
+                    'send-keys', '-t', sessionName + ':' + i,
+                    '-l', 'cd "' + wd + '"'
+                ]);
+                runTmux(['send-keys', '-t', sessionName + ':' + i, 'Enter']);
             }
             if (win.command) {
                 runTmux(['send-keys', '-t', sessionName + ':' + i, '-l', win.command]);
@@ -111,21 +119,16 @@ function startSession(sessionName, config, wd) {
                     runTmux(['send-keys', '-t', sessionName + ':' + i, 'Enter']);
                 }
             }
-            if (isSync) {
-                process.nextTick(next);
-            } else {
-                next();
-            }
+            next();
         }
     });
 }
 
 function parseWorkingDirectoryAndStartSession(name, config) {
-    var windows = config.windows || [],
-        wd = config.wd || (windows[0] && windows[0].wd);
+    var windows = config.windows || [];
 
-    if (wd) {
-        tildeExpand(wd, function(wd) {
+    if (config.wd) {
+        tildeExpand(config.wd, function(wd) {
             startSession(name, config, wd);
         });
     } else {
