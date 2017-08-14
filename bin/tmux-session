@@ -40,7 +40,12 @@ if (tmuxLs.status != 0) {
     // tmux 1.6: 'failed to connect to server'
     // tmux 2.0: 'failed to connect to server: Connection refused'
     // tmux 2.1: 'no server running on /tmp/...'
-    if (!/^(failed to connect to server|no server running on)/.test(stderr)) {
+    //       or: 'error connecting to /tmp/...' (before first server run)
+    if (
+        !/^failed to connect to server/.test(stderr) &&
+        !/^no server running on /.test(stderr) &&
+        !/^error connecting to /.test(stderr)
+    ) {
         throw new Error(util.format(
             'Unexpected tmux exit code %d - stderr: %s',
             tmuxLs.status,
