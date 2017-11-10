@@ -19,6 +19,11 @@ var program = require('yargs')
         alias    : 'config',
         describe : 'config object; see below',
         type     : 'string'
+    })
+    .option('d', {
+        alias    : 'direnv',
+        describe : 'run tmux in direnv compatible way',
+        default  : false
     });
 
 var argv = program.argv;
@@ -65,11 +70,17 @@ if (tmuxLs.status != 0) {
 }
 
 function runTmux(args, options) {
-    console.error('tmux %s', args.join(' '));
-    var tmux = spawnSync('tmux', args, options);
+    var cmd = 'tmux';
+    if (options && options.direnv) {
+      cmd = 'direnv';
+      args = ['exec', '/', 'tmux'].concat(args);
+    }
+    console.error('%s %s', cmd, args.join(' '));
+    var tmux = spawnSync(cmd, args, options);
     if (tmux.error || tmux.status != 0) {
         throw new Error(util.format(
-            "tmux command 'tmux %s' failed with %s: %s",
+            "tmux command '%s %s' failed with %s: %s",
+            cmd,
             args.join(' '),
             (tmux.error ? tmux.error.message : 'code' + tmux.status),
             (tmux.stderr || '').toString().trim()
@@ -81,7 +92,8 @@ function runTmux(args, options) {
 function startSession(sessionName, config, wd) {
     delete process.env.TMUX;
     runTmux(['new-session', '-s', sessionName, '-d'], {
-        cwd : wd
+        cwd : wd,
+        direnv: argv.direnv,
     });
 
     async.forEachOfSeries(config.windows || [], function(win, i, next) {
