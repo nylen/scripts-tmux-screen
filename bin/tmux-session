@@ -19,7 +19,13 @@ var program = require('yargs')
         alias    : 'config',
         describe : 'config object; see below',
         type     : 'string'
-    });
+    })
+    .option('i', {
+        alias    : 'ignore-existing',
+        describe : 'Exit with code 0 if the session already exists'
+            + '\n(otherwise this is an error)',
+        type     : 'boolean'
+    })
 
 var argv = program.argv;
 
@@ -56,10 +62,15 @@ if (tmuxLs.status != 0) {
     stdout.split('\n').forEach(function(line) {
         var sessionName = line.split(':')[0];
         if (sessionName == argv.name) {
-            throw new Error(util.format(
+            console.error(
                 "tmux session '%s' already exists",
                 argv.name
-            ));
+            );
+            if (argv.ignoreExisting) {
+                process.exit(0);
+            } else {
+                process.exit(9);
+            }
         }
     });
 }
